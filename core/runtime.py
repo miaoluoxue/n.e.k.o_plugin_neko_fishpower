@@ -8,8 +8,12 @@ import threading
 import time
 from typing import Any, Dict, Optional
 
-from .arbiter import Arbiter
+from ..adapters.llm_client import LLMProvider
+from ..adapters.push_sender import PushSender
+from ..adapters.telemetry import TelemetryClient
+from ..catgirl.bridge import CatgirlBridge
 from .achievement import Achievement
+from .arbiter import Arbiter
 from .challenge import Challenge
 from .config_model import FishpowerConfig
 from .contracts import FishEvent, FishState
@@ -23,10 +27,6 @@ from .safety_guard import SafetyGuard
 from .small_talk import SmallTalk
 from .templates import EmotionRenderer
 from .trip_summary import TripSummary
-from ..adapters.push_sender import PushSender
-from ..adapters.llm_client import LLMProvider
-from ..adapters.telemetry import TelemetryClient
-from ..catgirl.bridge import CatgirlBridge
 
 ACTIVITY_TITLES = {
     "cast": "抛竿",
@@ -653,7 +653,7 @@ class FishpowerRuntime:
             import re as _re
             m = _re.match(r"^IslandPosition(\d+)$", raw_island, _re.IGNORECASE)
             if m:
-                raw_island = "一号岛" if m.group(1) == "1" else f"{_cn_num(int(m.group(1)))}号岛"
+                raw_island = "一号岛" if m.group(1) == "1" else f"{self._cn_num(int(m.group(1)))}号岛"
         new_island = raw_island
         if new_island and new_island != self._last_island:
             self._last_island = new_island

@@ -16,8 +16,8 @@ class HudOcr:
 
     def is_available(self) -> bool:
         try:
-            import mss
-            from plugin.plugins._shared.rapidocr import RapidOcrBackend
+            import mss  # noqa: F401  # availability probe
+            from plugin.plugins._shared.rapidocr import RapidOcrBackend  # noqa: F401
             return True
         except ImportError:
             self._error = "mss 或 rapidocr 不可用"

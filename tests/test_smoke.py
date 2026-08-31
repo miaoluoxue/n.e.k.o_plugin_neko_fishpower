@@ -34,9 +34,9 @@ def test_core_modules_compile():
 
 
 def test_arbiter_gates_categories_and_cooldown():
+    from core.arbiter import Arbiter
     from core.config_model import FishpowerConfig
     from core.safety_guard import SafetyGuard
-    from core.arbiter import Arbiter
 
     cfg = FishpowerConfig({"dry_run": True})
     safety = SafetyGuard(cfg)
@@ -77,3 +77,62 @@ def test_runtime_event_renders_caught():
     renderer = EmotionRenderer(persona, llm=_FakeLlm())
     line = renderer.fact_prompt("caught", fish="Cod", weight=3.2, worth=45, extra="")
     assert "Cod" in line and "3.2" in line and "45" in line
+
+
+def test_scene_chat_knowledge_ocr():
+    """OCR 屏幕理解：Boss 机制命中聊知识；看不懂的屏幕安静（非十万个为什么）。"""
+    from core.scene_chat import SceneChat
+
+    class _FakeKB:
+        def creature_names(self):
+            return ["Cod"]
+
+        def bait_names(self):
+            return ["Worm"]
+
+        def creature_info(self, n):
+            return f"「{n}」值 30 金币 喵~"
+
+    import time
+    now = time.time()
+    sc = SceneChat(_FakeKB())
+    # 机制关键词兜底（scene_chat 不含 casino——已在场景层排除）
+    assert sc.topic_from_ocr("boss 出现了", now=now) is not None
+    # 知识库鱼种命中
+    sc2 = SceneChat(_FakeKB())
+    t = sc2.topic_from_ocr("caught Cod", now=now)
+    assert t is not None and "Cod" in t
+    # 看不懂的屏幕（去重后安静）
+    sc3 = SceneChat(_FakeKB())
+    assert sc3.topic_from_ocr("设置 图形 音量", now=now) is None
+
+
+def test_recall_island_no_dup_suffix():
+    """recall 岛屿名：已含"岛"不重复拼；原始名自动补"岛"。"""
+    from core.recall import Recall
+
+    class _FakeMem:
+        def query(self, kind, key):
+            return {"ts": 1725000000}
+
+        def weight_of(self, kind, key):
+            return 0.5
+
+    r = Recall(_FakeMem())
+    assert "一号岛岛" not in r.on_island("一号岛")
+    assert r.on_island("一号岛").startswith("又回一号岛了")
+    assert r.on_island("Island_1").startswith("又回Island_1岛了")
+
+
+def test_event_catalog_high_freq_suppressed():
+    """高频常态事件（cast/bite/miss）长冷却≈静默；大事件保持短冷却抢占。"""
+    from core.event_catalog import spec
+
+    for name in ("cast", "bite", "miss", "sold"):
+        s = spec(name)
+        assert s.cooldown_seconds >= 120, f"{name} 应高频静默（冷却>=120s）"
+    # 大事件高优先抢占
+    death = spec("player_death")
+    assert death.preempt is True and death.priority >= 80
+    caught = spec("caught")
+    assert caught.preempt is True

@@ -23,3 +23,6 @@ data/knowledge/creatures.json
 .ruff_cache/
 .tmp_*/
 store.db
+
+# ── 发布产物（git 里只留源码） ──
+dist/
