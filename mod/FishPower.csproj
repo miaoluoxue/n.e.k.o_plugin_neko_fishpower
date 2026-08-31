@@ -1,0 +1,68 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>NekoFishpower</AssemblyName>
+    <RootNamespace>NekoFishpower</RootNamespace>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- 纯本地引用：禁用网络 NuGet 源，离线可构建（netstandard2.0 用 SDK 内置 ref） -->
+    <RestoreSources></RestoreSources>
+    <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
+    <!-- GAME_DIR：游戏 exe 所在目录。优先命令行 -p:GAME_DIR=...，其次环境变量 NEKO_FISH_GAME_DIR（不硬编码路径） -->
+    <GAME_DIR Condition="'$(GAME_DIR)' == ''">$(NEKO_FISH_GAME_DIR)</GAME_DIR>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- GAME_DIR = 游戏 exe 所在目录（含 How to Fish_Data 与 BepInEx） -->
+    <Reference Include="BepInEx">
+      <HintPath>$(GAME_DIR)\BepInEx\core\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(GAME_DIR)\BepInEx\core\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="MonoMod.Utils">
+      <HintPath>$(GAME_DIR)\BepInEx\core\MonoMod.Utils.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- 游戏程序集 -->
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(GAME_DIR)\How to Fish_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(GAME_DIR)\How to Fish_Data\Managed\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(GAME_DIR)\How to Fish_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.LocalizationModule">
+      <HintPath>$(GAME_DIR)\How to Fish_Data\Managed\UnityEngine.LocalizationModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(GAME_DIR)\How to Fish_Data\Managed\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(GAME_DIR)\How to Fish_Data\Managed\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="FishNet.Runtime">
+      <HintPath>$(GAME_DIR)\How to Fish_Data\Managed\FishNet.Runtime.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GameKit.Dependencies">
+      <HintPath>$(GAME_DIR)\How to Fish_Data\Managed\GameKit.Dependencies.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

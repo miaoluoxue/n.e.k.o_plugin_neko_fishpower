@@ -1,0 +1,25 @@
+# ── 运行时/缓存 ──
+__pycache__/
+*.pyc
+*.pyo
+*.log
+logs/
+
+# ── mod 编译产物（源码保留） ──
+mod/bin/
+mod/obj/
+
+# ── 插件运行时数据：用户配置不上传 ──
+data/config/user_config.json
+data/config/settings.json
+data/knowledge/creatures.json
+
+# ── 密钥/环境 ──
+.env
+*.key
+
+# ── 测试/CI ──
+.pytest_cache/
+.ruff_cache/
+.tmp_*/
+store.db
