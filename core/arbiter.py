@@ -1,4 +1,4 @@
-"""提示仲裁器：类别开关 → 冷却 → 抢占通道 → 全局限流（无场景门控，事件驱动）。"""
+"""提示仲裁器：状态门控 → 类别开关 → 冷却 → 抢占通道 → 全局限流（照欧卡 §5）。"""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from typing import Any, Tuple
 
 from .event_catalog import BROADCAST_FREQUENCY_MULTIPLIERS, spec
 from .safety_guard import SafetyGuard
+from .state_machine import GameStateMachine
 
 
 class Arbiter:
@@ -15,6 +16,7 @@ class Arbiter:
     def __init__(self, config: object, safety: SafetyGuard) -> None:
         self.config = config
         self.safety = safety
+        self.scenario = GameStateMachine()
         self._last_fired: dict[str, tuple[float, bool]] = {}
         self._player_silence_until = 0.0
         self.broadcast_categories: dict[str, bool] = {}
@@ -34,6 +36,9 @@ class Arbiter:
             return False, "player_quiet_window"
 
         es = spec(event_name)
+        # 状态门控：游戏没开/主菜单时，非 lifecycle 事件全拒绝（修"没开游戏还提示换饵"）
+        if not self.scenario.allow(es.category):
+            return False, f"state_gated({self.scenario.current})"
         if self.broadcast_categories.get(es.category, True) is False:
             return False, "category_disabled"
 
@@ -60,6 +65,10 @@ class Arbiter:
         self._fire(event_name, False, now)
         return True, "rate_ok"
 
+    def update_state(self, st: Any) -> str:
+        """由快照更新状态机，返回当前状态。"""
+        return self.scenario.update(st)
+
     def _fire(self, event_name: str, critical: bool, now: float) -> None:
         self._last_fired[event_name] = (now, critical)
         self.safety.mark_output(critical=critical, now=now)
@@ -69,6 +78,7 @@ class Arbiter:
 
     def snapshot(self) -> dict[str, Any]:
         return {
+            "state": self.scenario.snapshot(),
             "broadcast_frequency": self.broadcast_frequency,
             "broadcast_categories": dict(self.broadcast_categories),
             "safety": self.safety.snapshot(),

@@ -37,11 +37,14 @@ def test_arbiter_gates_categories_and_cooldown():
     from core.arbiter import Arbiter
     from core.config_model import FishpowerConfig
     from core.safety_guard import SafetyGuard
+    from core.state_machine import FISHING
 
     cfg = FishpowerConfig({"dry_run": True})
     safety = SafetyGuard(cfg)
     arb = Arbiter(cfg, safety)
     arb.broadcast_categories = dict(cfg.broadcast_categories)
+    # 进入钓鱼状态（否则 caught 被状态门控拒绝）
+    arb.scenario.current = FISHING
 
     # 类别关闭 → 拒绝
     arb.broadcast_categories["chatter"] = False
@@ -136,3 +139,48 @@ def test_event_catalog_high_freq_suppressed():
     assert death.preempt is True and death.priority >= 80
     caught = spec("caught")
     assert caught.preempt is True
+
+
+def test_state_machine_gates_no_game():
+    """游戏状态机：没开游戏不交互（修"没开还提示换饵"）；钓鱼中可交互。"""
+    from core.state_machine import FISHING, MENU, NO_GAME, GameStateMachine
+
+    class _S:
+        def __init__(self, **kw):
+            self.connected = kw.get("connected", False)
+            self.boss_active = kw.get("boss_active", False)
+            self.betting = kw.get("betting", False)
+            self.island = kw.get("island", "")
+            self.phase = kw.get("phase", "")
+
+    sm = GameStateMachine()
+    # 游戏没开 → NO_GAME，不交互，禁游戏事件
+    assert sm.update(_S()) == NO_GAME
+    assert sm.interactive() is False
+    assert sm.allow("caught") is False
+    # 主菜单 → MENU，禁游戏事件
+    assert sm.update(_S(connected=True, island="", phase="")) == MENU
+    assert sm.allow("caught") is False
+    # 钓鱼中 → FISHING，可交互
+    assert sm.update(_S(connected=True, island="一号岛", phase="waiting")) == FISHING
+    assert sm.interactive() is True
+    assert sm.allow("caught") is True
+    # 断连强制回 NO_GAME
+    sm.force_no_game()
+    assert sm.current == NO_GAME
+    assert sm.interactive() is False
+
+
+def test_arbiter_gates_by_state():
+    """arbiter 状态门控：游戏没开时 caught 被拒（修误触发）。"""
+    from core.arbiter import Arbiter
+    from core.config_model import FishpowerConfig
+    from core.safety_guard import SafetyGuard
+
+    cfg = FishpowerConfig({"dry_run": True})
+    arb = Arbiter(cfg, SafetyGuard(cfg))
+    arb.broadcast_categories = dict(cfg.broadcast_categories)
+    # 默认 NO_GAME → caught 拒绝
+    ok, reason = arb.decide("caught")
+    assert ok is False
+    assert reason.startswith("state_gated")

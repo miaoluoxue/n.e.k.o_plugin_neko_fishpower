@@ -342,7 +342,8 @@ class FishpowerRuntime:
     async def _tick_loop(self) -> None:
         """重连循环：mod 未连接时每 2s 重试；连接后读循环由 TelemetryClient 管理。
 
-        连接建立调用 _on_game_start（内部有 60s 冷却，短断线重连不重复仪式）。
+        连接建立调用 _on_game_start（内部有 60s 冷却，短断线重连不重复仪式）；
+        未连接时状态机回 NO_GAME（游戏没开不聊游戏内容）。
         """
         while True:
             try:
@@ -351,6 +352,8 @@ class FishpowerRuntime:
                     if ok:
                         self._telemetry.start()
                         self._on_game_start()
+                    else:
+                        self.arbiter.scenario.force_no_game()
                 await asyncio.sleep(2.0)
             except asyncio.CancelledError:
                 raise
@@ -360,8 +363,8 @@ class FishpowerRuntime:
     async def _propose_loop(self) -> None:
         """陪伴循环：像朋友一样看屏幕、搭话、关心（全走 respond 宿主现编）。
 
-        画面畅聊(OCR)每 3 分钟看一次屏幕（不依赖游戏连接，主菜单/桌面也聊）；
-        游戏内再叠加主动关心/闲聊。
+        状态门控（照欧卡 §5）：只有游戏开着且在交互状态（钓鱼/赌场/Boss）
+        才 OCR 看屏幕/主动提议/闲聊；游戏没开或主菜单 → 安静。
         """
         import time as _time
         while True:
@@ -373,6 +376,9 @@ class FishpowerRuntime:
                     self._last_mem_save = now
                     self.memory.decay()
                     await self.memory.save()
+                # 状态门控：非交互状态（游戏没开/主菜单）不主动说话
+                if not self.arbiter.scenario.interactive():
+                    continue
                 # 画面畅聊：OCR 每 3 分钟看一次屏幕（陪玩核心，像朋友在旁）
                 if now - getattr(self, "_last_ocr_at", 0) >= 180:
                     self._last_ocr_at = now
@@ -381,9 +387,7 @@ class FishpowerRuntime:
                         await self.push.push_fact(
                             self.emotion.custom_fact(scene_topic, "chatter"))
                         continue
-                if not self._state.connected:
-                    continue
-                # 主动关心（低油/换饵/换岛/升级…）走 respond
+                # 主动关心（换饵/换岛/升级…）走 respond
                 propose = self.proactive.propose(now, self._state, self._session)
                 if propose:
                     await self.push.push_fact(
@@ -516,6 +520,7 @@ class FishpowerRuntime:
         self._track(name, msg)
         if name == "game_end":
             self._telemetry.connected = False  # mod 主动报退出
+            self.arbiter.scenario.force_no_game()  # 游戏退出：状态机回 NO_GAME
             self._spawn(self.push.push_fact(
                 self.emotion.fact_prompt("game_end")))
             self._spawn(self._finish_trip())
@@ -679,6 +684,8 @@ class FishpowerRuntime:
         st.journal_total = int(msg.get("journal_total", 0) or 0)
         st.phase = str(msg.get("phase", st.phase))
         st.raw = msg
+        # 状态机：每个快照更新游戏状态（门控后续交互）
+        self.arbiter.update_state(st)
 
     def _on_registry(self, msg: Dict[str, Any]) -> None:
         """图鉴注册表：写入 knowledge（mod 导出 → 知识库）。"""
