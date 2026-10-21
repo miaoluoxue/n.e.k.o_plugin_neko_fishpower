@@ -43,10 +43,6 @@ class LLMClient:
         self.timeout = timeout
 
     async def call(self, prompt: str) -> str:
-        try:
-            import httpx  # noqa: F401  # 可用性探测
-        except ImportError:
-            raise RuntimeError("需要 httpx")
         if self.provider in ("openai", "openai_compatible", "deepseek"):
             url = self.base_url or "https://api.openai.com/v1/chat/completions"
             headers = {"Content-Type": "application/json"}
@@ -71,7 +67,10 @@ class LLMClient:
             body = {"contents": [{"parts": [{"text": prompt}]}]}
         else:
             raise ValueError(f"不支持的 provider: {self.provider}")
-        import httpx as _h
+        try:
+            import httpx as _h
+        except ImportError as exc:              # 缺依赖给一句人话，别让栈帧吓人
+            raise RuntimeError("需要 httpx") from exc
         async with _h.AsyncClient(timeout=self.timeout) as client:
             resp = await client.post(url, headers=headers, json=body)
             resp.raise_for_status()

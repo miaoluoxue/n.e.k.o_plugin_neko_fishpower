@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 from typing import Any, Dict, Optional
 
 
@@ -15,13 +16,23 @@ class HudOcr:
         self._error: Optional[str] = None
 
     def is_available(self) -> bool:
-        try:
-            import mss  # noqa: F401  # availability probe
-            from plugin.plugins._shared.rapidocr import RapidOcrBackend  # noqa: F401
-            return True
-        except ImportError:
+        """mss（截屏）与宿主 rapidocr（识别）都就位才算可用。
+
+        用 importlib.util.find_spec 探测：只查模块是否可导入，
+        **不真的执行 import**（CI 里 ruff 用 --ignore-noqa，`# noqa: F401` 的
+        探测式 import 会被判 F401，也会在缺依赖时白白抛异常）。
+        """
+        if importlib.util.find_spec("mss") is None:
             self._error = "mss 或 rapidocr 不可用"
             return False
+        try:
+            spec = importlib.util.find_spec("plugin.plugins._shared.rapidocr")
+        except (ImportError, ValueError):       # 父包不可导入时 find_spec 会抛
+            spec = None
+        if spec is None:
+            self._error = "mss 或 rapidocr 不可用"
+            return False
+        return True
 
     def _ensure(self) -> bool:
         if self._backend is not None:
