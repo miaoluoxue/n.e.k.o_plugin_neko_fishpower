@@ -14,9 +14,9 @@ name = "N.E.K.O Team"
 recommended = ">=0.1.0,<0.2.0"
 supported = ">=0.1.0,<0.3.0"
 
-[plugin.i18n]
-default_locale = "zh-CN"
-locales_dir = "i18n"
+# 本插件没有多语言资源（代码里不使用 i18n，i18n/ 目录为空），
+# 因此不声明 [plugin.i18n]，否则 `neko-plugin check` 会报
+# "locales_dir does not exist: i18n"。将来要支持多语言时再加回该段并补 i18n/<locale>.json。
 
 [plugin_runtime]
 enabled = true
